@@ -1,7 +1,5 @@
-import com.dropbox.core.DbxAppInfo;
-import com.dropbox.core.DbxClient;
-import com.dropbox.core.DbxRequestConfig;
-import com.dropbox.core.DbxWebAuthNoRedirect;
+import com.dropbox.core.*;
+import javafx.application.Application;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -11,8 +9,8 @@ import java.util.Locale;
 /**
  * Created by Aditya on 10/18/2014.
  */
-public class DropboxWriteFile {
-	public static void main(String[] agrs) {
+public class DropboxWriteFile extends Application{
+	public void start(Stage stage) {
 		FileChooser fileChooser;
 		fileChooser = new FileChooser();
 		fileChooser.setInitialDirectory(new File("E:/Dropbox/"));
@@ -25,8 +23,6 @@ public class DropboxWriteFile {
 		DbxRequestConfig config = new DbxRequestConfig("JavaTutorial/1.0",
 				Locale.getDefault().toString());
 		DbxWebAuthNoRedirect webAuth = new DbxWebAuthNoRedirect(config, appInfo);
-		DbxClient client;
-
 		try {
 			File file = new File("users.dat");
 			FileInputStream fos = new FileInputStream(file);
@@ -37,11 +33,12 @@ public class DropboxWriteFile {
 
 			File fileToOpen = fileChooser.showOpenDialog(new Stage());
 			String fileName = fileToOpen.getPath();
+			byte[] bytes = new byte[0];
 			if (fileToOpen != null) {
 				// LET'S USE A FAST LOADING TECHNIQUE. WE'LL LOAD ALL OF THE
 				// BYTES AT ONCE INTO A BYTE ARRAY, AND THEN PICK THAT APART.
 				// THIS IS FAST BECAUSE IT ONLY HAS TO DO FILE READING ONCE
-				byte[] bytes = new byte[Long.valueOf(fileToOpen.length()).intValue()];
+				bytes = new byte[Long.valueOf(fileToOpen.length()).intValue()];
 				ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
 				FileInputStream fis = new FileInputStream(fileToOpen);
 				BufferedInputStream bis = new BufferedInputStream(fis);
@@ -49,24 +46,46 @@ public class DropboxWriteFile {
 				// HERE IT IS, THE ONLY READY REQUEST WE NEED
 				bis.read(bytes);
 				bis.close();
-
-				// NOW WE NEED TO LOAD THE DATA FROM THE BYTE ARRAY
-				DataInputStream dis = new DataInputStream(bais);
-
-				// NOTE THAT WE NEED TO LOAD THE DATA IN THE SAME
-				// ORDER AND FORMAT AS WE SAVED IT
-				// FIRST READ THE GRID DIMENSIONS
-				int initGridColumns = dis.readInt();
-				int initGridRows = dis.readInt();
-				int[][] newGrid = new int[initGridColumns][initGridRows];
-
-				// AND NOW ALL THE CELL VALUES
-				for (int i = 0; i < initGridColumns; i++) {
-					for (int j = 0; j < initGridRows; j++) {
-						newGrid[i][j] = dis.readInt();
-					}
-				}
 			}
+			int temp = bytes.length/2;
+			byte[] half1 = new byte[temp];
+			byte[] half2 = new byte[bytes.length - temp];
+			File file1 = new File(fileToOpen.getName() +"1.raid");
+			File file2 = new File(fileToOpen.getName() +"2.raid");
+			for(int i=0;i<temp;i++) {
+				half1[i] = bytes[i];
+			}
+			for(int i=temp,j=0;i<bytes.length;i++,j++) {
+				half1[j] = bytes[i];
+			}
+			FileOutputStream fis = new FileOutputStream(file1);
+			fis.write(half1);
+			fis = new FileOutputStream(file2);
+			fis.write(half2);
+
+			DbxClient client = new DbxClient(config, users[0].getAccessToken());
+			File inputFile = new File(fileToOpen.getName() +"1.raid");
+			FileInputStream inputStream = new FileInputStream(inputFile);
+			try {
+				DbxEntry.File uploadedFile = client.uploadFile("/"+file1.getName(),
+						DbxWriteMode.add(), inputFile.length(), inputStream);
+				System.out.println("Uploaded: " + uploadedFile.toString());
+			} finally {
+				inputStream.close();
+			}
+
+			client = new DbxClient(config, users[1].getAccessToken());
+			inputFile = new File(fileToOpen.getName() +"2.raid");
+			inputStream = new FileInputStream(inputFile);
+			try {
+				DbxEntry.File uploadedFile = client.uploadFile("/"+file2.getName(),
+						DbxWriteMode.add(), inputFile.length(), inputStream);
+				System.out.println("Uploaded: " + uploadedFile.toString());
+			} finally {
+				inputStream.close();
+			}
+
+
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (ClassNotFoundException e) {
@@ -74,5 +93,8 @@ public class DropboxWriteFile {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	public static void main(String[] args) {
+		launch(args);
 	}
 }
